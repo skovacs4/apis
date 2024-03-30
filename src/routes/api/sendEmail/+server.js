@@ -1,4 +1,3 @@
-// src/api/sendEmail.server.js
 import nodemailer from "nodemailer";
 import { GOOGLE_EMAIL, GOOGLE_EMAIL_PASSWORD } from "$env/static/private";
 
@@ -29,7 +28,13 @@ export async function POST({ request }) {
 
     try {
         await transporter.sendMail({ from: GOOGLE_EMAIL, to, subject, text, html });
-        return new Response(JSON.stringify({ message: 'Email sent!' }), { status: 200 });
+        // Set CORS headers to allow all origins
+        const headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        };
+        return new Response(JSON.stringify({ message: 'Email sent!' }), { status: 200, headers });
     } catch (error) {
         console.error("Error sending email:", error);
         return new Response(JSON.stringify({ error: 'Failed to send email' }), { status: 500 });
@@ -38,5 +43,11 @@ export async function POST({ request }) {
 
 // New GET handler
 export async function GET() {
-  return new Response(JSON.stringify({ message: 'Hello from GET!' }), { status: 200 });
+    // Set CORS headers to allow all origins
+    const headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    };
+    return new Response(JSON.stringify({ message: 'Hello from GET!' }), { status: 200, headers });
 }
