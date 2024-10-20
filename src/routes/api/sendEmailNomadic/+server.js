@@ -59,6 +59,16 @@ export async function POST({ request }) {
     }
 }
 
+export async function OPTIONS() {
+    const headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    return new Response(null, { status: 204, headers });
+}
+
 /**
  * API Route - Handle GET requests
  */
