@@ -1,13 +1,13 @@
 import nodemailer from "nodemailer";
-import { GOOGLE_EMAIL, GOOGLE_EMAIL_PASSWORD } from "$env/static/private";
+import { EMAIL, EMAIL_PASSWORD } from "$env/static/private";
 
 // Create transporter with authentication details
 let transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
+    host: "mail.thenomadicdigital.com",
     port: 587,
     auth: {
-        user: GOOGLE_EMAIL,
-        pass: GOOGLE_EMAIL_PASSWORD,
+        user: EMAIL,
+        pass: EMAIL_PASSWORD,
     },
 });
 
@@ -32,10 +32,10 @@ export async function POST({ request }) {
     var sender = "";
 
     if (fromDisplayName && fromDisplayName.trim() !== "") {
-        sender = `"${fromDisplayName}" <${GOOGLE_EMAIL}>`;
+        sender = `"${fromDisplayName}" <${EMAIL}>`;
     } else {
         // Fallback display name if fromDisplayName is not provided or empty
-        sender = `"Contact" <${GOOGLE_EMAIL}>`;
+        sender = `"Contact" <${EMAIL}>`;
     }
 
     try {
