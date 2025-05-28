@@ -1,8 +1,7 @@
 import { text } from '@sveltejs/kit';
 
 const API_URL = 'https://conteb2b.com/api/v1/clients/list';
-const TOKEN =
-  'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImRlcG96aXRfY29udGVlbGVnYW50LnJvIiwidGltZXN0YW1wIjoxNzQ4NDYxOTc4fQ.XNPtKngXYRQOsMSoc0rZAtUmmP2GhyLpVZ23WUx8mDA';
+const TOKEN = process.env.API_KEY_CONTE;
 
 const HEADERS = {
   'Content-Type': 'application/json',
