@@ -11,6 +11,8 @@
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"csv-parse": "^6.1.0",
+		"csv-stringify": "^6.6.0",
 		"svelte": "^4.2.7",
 		"vite": "^5.2.7"
 	},

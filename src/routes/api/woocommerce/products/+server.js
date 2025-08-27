@@ -78,12 +78,12 @@ function mapToShopifyRow(product, variation = null, optionNames = ['', '', '']) 
   const tags = (product.tags || []).map(t => t.name).join(', ');
   const published = product.status === 'publish' ? 'TRUE' : 'FALSE';
 
-  // Images
-  const image = product.images?.[0] || {};
-  const imageSrc = image?.src || '';
-  const imageAlt = image?.alt || image?.name || '';
+  // Parent image (used only on the parent row)
+  const parentImage = product.images?.[0] || {};
+  const parentImageSrc = parentImage?.src || '';
+  const parentImageAlt = parentImage?.alt || parentImage?.name || '';
 
-  // Weight (g) — assumes Woo weight unit is kg; adjust if not
+  // Weight (g)
   const weightNumber = Number(base.weight);
   const grams = Number.isFinite(weightNumber) ? Math.round(weightNumber * 1000) : 0;
 
@@ -101,23 +101,28 @@ function mapToShopifyRow(product, variation = null, optionNames = ['', '', '']) 
   const metaBarcode =
     base.meta_data?.find(m => ['_ean', '_gtin', '_barcode'].includes(m?.key))?.value || '';
 
-  // ----- Options -----
+  // Options
   let [opt1, opt2, opt3] = optionNames;
   let [val1, val2, val3] = ['', '', ''];
 
   if (variation) {
     [val1, val2, val3] = getVariationOptionValues(variation, optionNames);
   } else {
-    // Parent row:
     if (product.type === 'simple' || optionNames.every(n => !n)) {
-      // Shopify requirement for single-variant items
       opt1 = 'Title';
       val1 = 'Default Title';
       opt2 = '';
       opt3 = '';
     }
-    // For variable products, keep names and leave values blank on parent
   }
+
+  // Variant image (Woo → Shopify)
+  const variantImageSrc = variation?.image?.src || '';
+
+  // IMPORTANT:
+  // - Parent row: set Image Src/Image Position/Alt; Variant Image empty
+  // - Variant rows: DO NOT set Image Src/Position/Alt; set Variant Image
+  const isVariant = !!variation;
 
   return {
     Handle: handle,
@@ -145,9 +150,10 @@ function mapToShopifyRow(product, variation = null, optionNames = ['', '', '']) 
     'Variant Taxable': taxable,
     'Variant Barcode': metaBarcode,
 
-    'Image Src': imageSrc,
-    'Image Position': imageSrc ? 1 : '',
-    'Image Alt Text': imageAlt,
+    // Parent image only:
+    'Image Src': isVariant ? '' : parentImageSrc,
+    'Image Position': isVariant ? '' : (parentImageSrc ? 1 : ''),
+    'Image Alt Text': isVariant ? '' : parentImageAlt,
 
     'Gift Card': 'FALSE',
     'SEO Title': '',
@@ -160,7 +166,9 @@ function mapToShopifyRow(product, variation = null, optionNames = ['', '', '']) 
     'Google Shopping / Condition': 'new',
     'Google Shopping / Custom Product': 'TRUE',
 
-    'Variant Image': '',
+    // Variant image only:
+    'Variant Image': isVariant ? (variantImageSrc || '') : '',
+
     'Variant Weight Unit': 'g',
     'Variant Tax Code': '',
     'Cost per item': '',
@@ -176,6 +184,18 @@ function mapToShopifyRow(product, variation = null, optionNames = ['', '', '']) 
   };
 }
 
+// Add this helper above GET()
+function hasNameWithoutValue(row) {
+  for (let i = 1; i <= 3; i++) {
+    const nameKey = `Option${i} Name`;
+    const valueKey = `Option${i} Value`;
+    const nameSet = !!(row[nameKey] && String(row[nameKey]).trim());
+    const valueBlank = !(row[valueKey] && String(row[valueKey]).trim());
+    if (nameSet && valueBlank) return true;
+  }
+  return false;
+}
+
 /* ---------- GET handler: fetch all products, batch into CSVs, ZIP ---------- */
 export async function GET({ url }) {
   try {
@@ -184,8 +204,9 @@ export async function GET({ url }) {
     const perPage = Math.min(100, Math.max(1, Number(url.searchParams.get('per_page') || 100))); // Woo max 100
     const categorySlug = url.searchParams.get('category') || '';
     const status = (url.searchParams.get('status') || 'publish').toLowerCase(); // 'publish' | 'any' | 'draft'...
+    const onlyOneVariable = url.searchParams.get('only_one') === '1';            // NEW
 
-    console.log(`[Woo Export] Start | per_page=${perPage} | batch=${batchSize} | status=${status} | category=${categorySlug || '(all)'}`);
+    console.log(`[Woo Export] Start | per_page=${perPage} | batch=${batchSize} | status=${status} | category=${categorySlug || '(all)'} | only_one=${onlyOneVariable}`);
 
     // Resolve category → ID (optional)
     let categoryId = '';
@@ -210,16 +231,16 @@ export async function GET({ url }) {
 
     // CSV fields (stable order)
     const fields = [
-      'Handle','Title','Body (HTML)','Vendor','Product Category','Type','Tags','Published',
-      'Option1 Name','Option1 Value','Option2 Name','Option2 Value','Option3 Name','Option3 Value',
-      'Variant SKU','Variant Grams','Variant Inventory Tracker','Variant Inventory Qty','Variant Inventory Policy',
-      'Variant Fulfillment Service','Variant Price','Variant Compare At Price','Variant Requires Shipping',
-      'Variant Taxable','Variant Barcode','Image Src','Image Position','Image Alt Text','Gift Card',
-      'SEO Title','SEO Description','Google Shopping / Google Product Category','Google Shopping / Gender',
-      'Google Shopping / Age Group','Google Shopping / MPN','Google Shopping / Condition',
-      'Google Shopping / Custom Product','Variant Image','Variant Weight Unit','Variant Tax Code',
-      'Cost per item','Included / United States','Price / United States','Compare At Price / United States',
-      'Included / International','Price / International','Compare At Price / International','Status'
+      'Handle', 'Title', 'Body (HTML)', 'Vendor', 'Product Category', 'Type', 'Tags', 'Published',
+      'Option1 Name', 'Option1 Value', 'Option2 Name', 'Option2 Value', 'Option3 Name', 'Option3 Value',
+      'Variant SKU', 'Variant Grams', 'Variant Inventory Tracker', 'Variant Inventory Qty', 'Variant Inventory Policy',
+      'Variant Fulfillment Service', 'Variant Price', 'Variant Compare At Price', 'Variant Requires Shipping',
+      'Variant Taxable', 'Variant Barcode', 'Image Src', 'Image Position', 'Image Alt Text', 'Gift Card',
+      'SEO Title', 'SEO Description', 'Google Shopping / Google Product Category', 'Google Shopping / Gender',
+      'Google Shopping / Age Group', 'Google Shopping / MPN', 'Google Shopping / Condition',
+      'Google Shopping / Custom Product', 'Variant Image', 'Variant Weight Unit', 'Variant Tax Code',
+      'Cost per item', 'Included / United States', 'Price / United States', 'Compare At Price / United States',
+      'Included / International', 'Price / International', 'Compare At Price / International', 'Status'
     ];
     const parser = new Parser({ fields });
     const zip = new JSZip();
@@ -229,8 +250,9 @@ export async function GET({ url }) {
     let rows = [];
     let csvCount = 0;
     let totalRows = 0;
+    let exportedOne = false; // NEW
 
-    while (hasMore) {
+    while (hasMore && !exportedOne) {
       console.log(`[Woo Export] Fetching products page ${page}...`);
       let api = `${WOO_BASE_URL_CONTE}/wp-json/wc/v3/products?per_page=${perPage}&page=${page}&status=${encodeURIComponent(status)}`;
       if (categoryId) api += `&category=${categoryId}`;
@@ -243,6 +265,9 @@ export async function GET({ url }) {
       if (!products.length) break;
 
       for (const p of products) {
+        // If we only want one variable product, skip non-variable items
+        if (onlyOneVariable && p.type !== 'variable') continue;
+
         // VARIABLE products: fetch variations first to compute **real** option names
         let variations = [];
         let optionNames = ['', '', ''];
@@ -267,6 +292,19 @@ export async function GET({ url }) {
 
         // VARIANT rows
         for (const v of variations) {
+          // console.log('[VARIANT IMG]', {
+          //   product_id: p.id,
+          //   sku: v?.sku,
+          //   image: v?.image?.src || '(none)'
+          // });
+          const variantRow = mapToShopifyRow(p, v, optionNames);
+
+          // Skip variants that have an option label but no value
+          if (hasNameWithoutValue(variantRow)) {
+            console.log(`[Woo Export] Skipping variant (name without value) | product=${p.id} sku=${v?.sku || '(no-sku)'}`);
+            continue;
+          }
+
           rows.push(mapToShopifyRow(p, v, optionNames));
           totalRows++;
 
@@ -280,6 +318,12 @@ export async function GET({ url }) {
           }
         }
 
+        // If we only wanted one variable product, stop after the first we processed
+        if (onlyOneVariable) {
+          exportedOne = true;
+          break;
+        }
+
         // Flush batch in case of simple products
         if (rows.length >= batchSize) {
           const csv = parser.parse(rows);
@@ -291,7 +335,7 @@ export async function GET({ url }) {
         }
       }
 
-      hasMore = products.length === perPage;
+      hasMore = products.length === perPage && !exportedOne;
       page += 1;
     }
 
@@ -319,13 +363,16 @@ export async function GET({ url }) {
 
     return json({
       success: true,
-      message: 'Batches prepared in ZIP',
+      message: exportedOne
+        ? 'Exported the first variable product only'
+        : 'Batches prepared in ZIP',
       total_rows: totalRows,
       csv_files: csvCount,
       per_page: perPage,
       batch: batchSize,
       status,
-      category: categorySlug || null
+      category: categorySlug || null,
+      only_one: onlyOneVariable
     });
   } catch (err) {
     console.error('[Woo Export] ERROR:', err);
